@@ -106,7 +106,6 @@ def validate_host(host):
         print("----- error with domain name validation!")
         return False
 
-
 def is_valid_ip(host):
     try:
         ipaddress.ip_address(host)
@@ -138,31 +137,73 @@ def is_valid_port_range(port_range):
 
     return False
 
+def print_scan_summary(open_ports, banners):
+    print("Scan Summary:")
+    # Port left aligned 8 characters wide
+    # Service left aligned 15 characters wide
+    print(f"{'Port':<8} {'Service':<15} {'Banner'}")
+    # 60 hyphens
+    print("-" * 60)
+
+    # Loop all open ports found
+    for port in open_ports:
+        # Get associated, often used, protocol/service for port number
+        service = COMMON_PORTS.get(port, "Unknown")
+        # Get banner for open port
+        banner = banners.get(port, "None")
+        print(f"{port:<8} {service:<15} {banner}")
+
+
 def scan(host,port_range):
     print(f"Scan initiated for {host} in range {port_range}")
-    start_port, end_port = port_range.split("-")
+    # Get start port and end port from user input
+    start_port, end_port = map(int, port_range.split("-"))
+
+    # Filter relevant common ports (done for efficiency
+    # further implementation would include all if desired)
+    scan_ports = [port for port in COMMON_PORTS if start_port <= port <= end_port]
+    if not scan_ports:
+        print("No common ports fall within this range.")
+        return
+
     open_ports = []
+    banners = {}
+
+    # Start tracking time
     start_time = time.time()
 
-    # Loop all ports
-    for port in range(int(start_port), int(end_port) + 1):
-        # Initialize socket with family and socket type: IPV4 and TCP
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(0.5)
+    # Try to connect to all common ports within range of user input
+    for port in scan_ports:
+        try:
+            # Create socket and automatically close it
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                # Wait for only 2 seconds for response
+                sock.settimeout(2)
+                # Attempt to connect to socket, return connection status 0-success 1-failure
+                connection = sock.connect_ex((host,port))
 
-        connection = sock.connect_ex((host,port))
+                # Check if successful
+                if connection == 0:
+                    # Add open port to list
+                    open_ports.append(port)
 
-        # Connected
-        if connection == 0:
-            open_ports.append(port)
+                    try:
+                        # sock.sendall(b"\r\n")
+                        # Capture banner/initial message upon connection, and format for readability
+                        banner = sock.recv(1024).decode(errors="ignore").strip()
+                        # Add port and associated banner to dictionary
+                        banners[port] = banner if banner else "Uncertain"
+                    except:
+                        banners[port] = "Uncertain"
+        except Exception as e:
+            continue
 
+    # Stop tracking time
     end_time = time.time()
     elapsed_time = end_time - start_time
 
-    print(f"Open Ports: ")
-    for port in open_ports:
-        print(f" - {port} ({COMMON_PORTS.get(port, 'Unknown Service')})")
-    print(f"Scan completed in {elapsed_time:.3f} seconds.")
+    print_scan_summary(open_ports, banners)
+    print(f"\nScan completed in {elapsed_time:.2f} seconds.")
 
 host, port_range = get_user_input()
 scan(host, port_range)
