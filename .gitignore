@@ -1,6 +1,6 @@
 # Ignore bad and intermediate main files
-badformat.main
-betterformat.main
+badformat_main.py
+betterformat_main.py
 
 # Ignore scan result output
 scan_results.json
