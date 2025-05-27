@@ -127,12 +127,12 @@ def is_valid_port_range(port_range):
 
     return False
 
-def create_export_dict():
+def create_export_dict(host, port_range, open_ports, port_to_banner, port_to_time, total_time):
     export_dict = {
-        "open_ports": {},
-        "total_execution_time": round(total_time, 2),
         "host": host,
-        "scanned_port_range": port_range
+        "scanned_port_range": port_range,
+        "total_execution_time": round(total_time, 2),
+        "open_ports": {}
     }
 
     for port in open_ports:
@@ -145,81 +145,93 @@ def create_export_dict():
 
     return export_dict
 
-def export_json():
-    export_dict = create_export_dict()
+def export_json(summary_list):
     with open("scan_results.json", "w") as file:
-        json.dump(export_dict, file, indent=2)
+        json.dump(summary_list, file, indent=4)
     print("Scan results exported to scan_results.json")
 
-def print_scan_summary():
+def print_scan_summary(open_ports, port_to_banner):
     print("Scan Summary:")
-    # Port left aligned 8 characters wide
-    # Service left aligned 15 characters wide
     print(f"{'Port':<8} {'Service':<15} {'Banner'}")
-    # 60 hyphens
     print("-" * 60)
 
-    # Loop all open ports found
     for port in open_ports:
-        # Get associated, often used, protocol/service for port number
         service = COMMON_PORTS.get(port, "Unknown")
-        # Get banner for open port
         banner = port_to_banner.get(port, "None")
         print(f"{port:<8} {service:<15} {banner}")
 
-def scan(host,port_range):
+def scan(host, port_range):
     print(f"Scan initiated for {host} in range {port_range}")
-    # Get start port and end port from user input
+    
     start_port, end_port = map(int, port_range.split("-"))
-
-    # Filter relevant common ports (done for efficiency
-    # further implementation would include all if desired)
+    
     scan_ports = [port for port in COMMON_PORTS if start_port <= port <= end_port]
     if not scan_ports:
         print("No common ports fall within this range.")
-        return
+        return 0, [], {}, {}
 
-    # Start tracking time for total scan
+    # Initialize local variables
+    open_ports = []
+    port_to_banner = {}
+    port_to_time = {}
+
     start_total_time = time.time()
 
-    # Try to connect to all common ports within range of user input
     for port in scan_ports:
         try:
-            # Create socket and automatically close it
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 start_time = time.time()
-
-                # Wait for only 2 seconds for response
                 sock.settimeout(5)
-                # Attempt to connect to socket, return connection status 0-success 1-failure
-                connection = sock.connect_ex((host,port))
+                connection = sock.connect_ex((host, port))
 
-                # Check if successful
                 if connection == 0:
-                    # Add open port to list
                     open_ports.append(port)
-
                     try:
-                        # sock.sendall(b"\r\n")
-                        # Capture banner/initial message upon connection, and format for readability
                         banner = sock.recv(1024).decode(errors="ignore").strip()
-                        # Add port and associated banner to dictionary
                         port_to_banner[port] = banner if banner else "Uncertain"
                     except:
                         port_to_banner[port] = "Uncertain"
+
                     port_to_time[port] = time.time() - start_time
         except Exception:
             continue
 
     total_time = time.time() - start_total_time
-    print_scan_summary()
+
+    print_scan_summary(open_ports, port_to_banner)
     print(f"\nScan completed in {total_time:.2f} seconds.")
-    return total_time
+    
+    return total_time, open_ports, port_to_banner, port_to_time
 
-port_to_banner = {}
-port_to_time = {}
-open_ports = []
+def main():
+    host_to_port_range = {}
+    print("Welcome to the multi-host port scanner!")
 
-host, port_range = get_user_input()
-total_time = scan(host, port_range)
-export_json()
+    host, port_range = get_user_input()
+    host_to_port_range[host] = port_range
+
+    while True:
+        user_choice = input("Would you like to scan another host? (y/n): ").strip().lower()
+        if user_choice == "n":
+            break
+        elif user_choice == "y":
+            host, port_range = get_user_input()
+            host_to_port_range[host] = port_range
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
+
+    entire_summary_list = []
+
+    for host, port_range in host_to_port_range.items():
+        print(f"\n--- Scanning {host} ---")
+        scan_time, open_ports, port_to_banner, port_to_time = scan(host, port_range)
+
+        host_summary = create_export_dict(
+            host, port_range, open_ports, port_to_banner, port_to_time, scan_time
+        )
+        entire_summary_list.append(host_summary)
+
+    export_json(entire_summary_list)
+    
+if __name__ == "__main__":
+    main()

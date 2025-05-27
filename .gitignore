@@ -1,1 +1,9 @@
+# Ignore bad and intermediate main files
+badformat.main
+betterformat.main
+
+# Ignore scan result output
 scan_results.json
+
+# Ignore Python bytecode cache folders
+__pycache__/
