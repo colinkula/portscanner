@@ -2,6 +2,7 @@ import ipaddress
 import socket
 import re
 import time
+import json
 
 COMMON_PORTS = {
     20: "FTP Data Transfer",
@@ -78,7 +79,7 @@ def get_user_input():
     # Loop until user chooses correct syntax for port number range
     while True:
         # Get input and store it
-        port_range = input("Enter the port range (Format: numbers 0-65535 to 1-65535 | Example: 0-1024): ")
+        port_range = input("Enter the port range | Example: 0-1024): ")
         # Quit if user desires
         if port_range == "q":
             return False
@@ -91,19 +92,10 @@ def get_user_input():
 
 def validate_host(host):
     if is_valid_ip(host):
-        print("----- IP is valid")
         return True
-    
-    print("----- IP is invalid, trying domain name...")
-    try:
-        if is_valid_domain_name(host):
-            IP = socket.gethostbyname(host)
-            print(f"----- IP found! ({IP})")
-            return True
-        else:
-            print("----- domain name is invalid")
-    except socket.error:
-        print("----- error with domain name validation!")
+    elif is_valid_domain_name(host):
+        return True
+    else:
         return False
 
 def is_valid_ip(host):
@@ -122,7 +114,6 @@ def is_valid_domain_name(host):
 def is_valid_port_range(port_range):
     # If the hyphen is not in the user input for the port_range, then automatically return false
     if "-" not in port_range:
-        print("----- missing hyphen (-) in response")
         return False
     
     try:
@@ -130,14 +121,37 @@ def is_valid_port_range(port_range):
         start_num = int(start_str)
         end_num = int(end_str)
         if 0 <= start_num <= 65535 and 1 <= end_num <= 65535 and start_num <= end_num:
-            print("----- port range is valid\n")
             return True
     except ValueError:
         return False
 
     return False
 
-def print_scan_summary(open_ports, banners):
+def create_export_dict():
+    export_dict = {
+        "open_ports": {},
+        "total_execution_time": round(total_time, 2),
+        "host": host,
+        "scanned_port_range": port_range
+    }
+
+    for port in open_ports:
+        export_dict["open_ports"][port] = {
+            "service": COMMON_PORTS.get(port, "Unknown"),
+            "banner": port_to_banner.get(port, "Uncertain"),
+            "status": "OPEN",
+            "execution_time": round(port_to_time.get(port, 0), 2)
+        }
+
+    return export_dict
+
+def export_json():
+    export_dict = create_export_dict()
+    with open("scan_results.json", "w") as file:
+        json.dump(export_dict, file, indent=2)
+    print("Scan results exported to scan_results.json")
+
+def print_scan_summary():
     print("Scan Summary:")
     # Port left aligned 8 characters wide
     # Service left aligned 15 characters wide
@@ -150,9 +164,8 @@ def print_scan_summary(open_ports, banners):
         # Get associated, often used, protocol/service for port number
         service = COMMON_PORTS.get(port, "Unknown")
         # Get banner for open port
-        banner = banners.get(port, "None")
+        banner = port_to_banner.get(port, "None")
         print(f"{port:<8} {service:<15} {banner}")
-
 
 def scan(host,port_range):
     print(f"Scan initiated for {host} in range {port_range}")
@@ -166,19 +179,18 @@ def scan(host,port_range):
         print("No common ports fall within this range.")
         return
 
-    open_ports = []
-    banners = {}
-
-    # Start tracking time
-    start_time = time.time()
+    # Start tracking time for total scan
+    start_total_time = time.time()
 
     # Try to connect to all common ports within range of user input
     for port in scan_ports:
         try:
             # Create socket and automatically close it
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                start_time = time.time()
+
                 # Wait for only 2 seconds for response
-                sock.settimeout(2)
+                sock.settimeout(5)
                 # Attempt to connect to socket, return connection status 0-success 1-failure
                 connection = sock.connect_ex((host,port))
 
@@ -192,18 +204,22 @@ def scan(host,port_range):
                         # Capture banner/initial message upon connection, and format for readability
                         banner = sock.recv(1024).decode(errors="ignore").strip()
                         # Add port and associated banner to dictionary
-                        banners[port] = banner if banner else "Uncertain"
+                        port_to_banner[port] = banner if banner else "Uncertain"
                     except:
-                        banners[port] = "Uncertain"
-        except Exception as e:
+                        port_to_banner[port] = "Uncertain"
+                    port_to_time[port] = time.time() - start_time
+        except Exception:
             continue
 
-    # Stop tracking time
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+    total_time = time.time() - start_total_time
+    print_scan_summary()
+    print(f"\nScan completed in {total_time:.2f} seconds.")
+    return total_time
 
-    print_scan_summary(open_ports, banners)
-    print(f"\nScan completed in {elapsed_time:.2f} seconds.")
+port_to_banner = {}
+port_to_time = {}
+open_ports = []
 
 host, port_range = get_user_input()
-scan(host, port_range)
+total_time = scan(host, port_range)
+export_json()

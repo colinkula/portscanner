@@ -15,9 +15,9 @@ Here are some features that I plan on adding and will check off (+) as I continu
 * Scan multiple hosts
 * Add IDS evasion techniques
 * Recon features like Geolocation or WHOIS lookup
+* Threading/Concurrency
 
 Here are some other features that I think would be cool but probably wont implement in full:
 
 * Live progress bar
 * Database history logging
-* Threading/Concurrency
