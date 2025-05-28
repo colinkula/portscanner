@@ -1,55 +1,44 @@
-import socket
-import time
+import socket, time
 from constants import COMMON_PORTS
+from utils import print_summary, get_banner
 
-def scan(host, port_range):
-    start_port, end_port = map(int, port_range.split("-"))
-    scan_ports = [port for port in COMMON_PORTS if start_port <= port <= end_port]
+class PortScanner:
+    def __init__(self, host, port_range):
+        self.host = host
+        self.start_port, self.end_port = map(int, port_range.split("-"))
+        self.ports = [p for p in COMMON_PORTS if self.start_port <= p <= self.end_port]
+        self.open_ports = []
+        self.port_data = {}
 
-    if not scan_ports:
-        print("No common ports fall within this range.")
-        return 0, [], {}, {}
+    def scan(self):
+        start_time = time.time()
 
-    open_ports = []
-    port_to_banner = {}
-    port_to_time = {}
-    start_total_time = time.time()
+        for port in self.ports:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(5)
+                    t0 = time.time()
+                    result = sock.connect_ex((self.host, port))
+                    duration = time.time() - t0
 
-    for port in scan_ports:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                start_time = time.time()
-                sock.settimeout(5)
-                if sock.connect_ex((host, port)) == 0:
-                    open_ports.append(port)
-                    try:
-                        banner = sock.recv(1024).decode(errors="ignore").strip()
-                        port_to_banner[port] = banner if banner else "Uncertain"
-                    except:
-                        port_to_banner[port] = "Uncertain"
-                    port_to_time[port] = time.time() - start_time
-        except Exception:
-            continue
+                    if result == 0:
+                        banner = get_banner(sock)
+                        self.open_ports.append(port)
+                        self.port_data[port] = {
+                            "service": COMMON_PORTS.get(port, "Unknown"),
+                            "banner": banner,
+                            "execution_time": round(duration, 2),
+                            "status": "OPEN"
+                        }
+            except Exception:
+                continue
 
-    total_time = time.time() - start_total_time
-    print(f"\nScan completed in {total_time:.2f} seconds.")
-    return total_time, open_ports, port_to_banner, port_to_time
+        total_time = time.time() - start_time
+        print_summary(self.host, self.open_ports, self.port_data, total_time)
 
-def create_export_dict(host, port_range, open_ports, port_to_banner, port_to_time, total_time):
-    from constants import COMMON_PORTS
-    export_dict = {
-        "host": host,
-        "scanned_port_range": port_range,
-        "total_execution_time": round(total_time, 2),
-        "open_ports": {}
-    }
-
-    for port in open_ports:
-        export_dict["open_ports"][port] = {
-            "service": COMMON_PORTS.get(port, "Unknown"),
-            "banner": port_to_banner.get(port, "Uncertain"),
-            "status": "OPEN",
-            "execution_time": round(port_to_time.get(port, 0), 2)
+        return {
+            "host": self.host,
+            "scanned_port_range": f"{self.start_port}-{self.end_port}",
+            "total_execution_time": round(total_time, 2),
+            "open_ports": self.port_data
         }
-
-    return export_dict

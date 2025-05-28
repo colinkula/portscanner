@@ -1,27 +1,21 @@
-import ipaddress
-import re
+import json
 
-def validate_host(host):
-    return is_valid_ip(host) or is_valid_domain_name(host)
-
-def is_valid_ip(host):
+def get_banner(sock):
     try:
-        ipaddress.ip_address(host)
-        return True
-    except ValueError:
-        return False
+        return sock.recv(1024).decode(errors="ignore").strip() or "Uncertain"
+    except:
+        return "Uncertain"
 
-def is_valid_domain_name(host):
-    domain_regex = r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.[A-Za-z]{2,})+$"
-    return re.match(domain_regex, host) is not None
+def print_summary(host, open_ports, port_data, total_time):
+    print(f"\nScan results for {host}")
+    print(f"{'Port':<8} {'Service':<15} {'Banner'}")
+    print("-" * 60)
+    for port in open_ports:
+        data = port_data[port]
+        print(f"{port:<8} {data['service']:<15} {data['banner']}")
+    print(f"\nScan completed in {total_time:.2f} seconds.")
 
-def is_valid_port_range(port_range):
-    if "-" not in port_range:
-        return False
-    try:
-        start_str, end_str = port_range.split("-")
-        start = int(start_str)
-        end = int(end_str)
-        return 0 <= start <= 65535 and 1 <= end <= 65535 and start <= end
-    except ValueError:
-        return False
+def export_json(data):
+    with open("scan_results.json", "w") as f:
+        json.dump(data, f, indent=4)
+    print("Results exported to scan_results.json")
