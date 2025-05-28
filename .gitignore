@@ -2,6 +2,9 @@
 badformat_main.py
 betterformat_main.py
 
+# Ignore testing script
+test_port_scanner_app.py
+
 # Ignore scan result output
 scan_results.json
 

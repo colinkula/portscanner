@@ -1,30 +1,79 @@
+import argparse
 from scanner import PortScanner
 from validator import get_valid_host_and_range
 from utils import export_json
 
-def main():
-    print("Welcome to the Multi-Host Port Scanner!")
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Multi-Host Port Scanner")
+    parser.add_argument(
+        "--hosts",
+        nargs = "+",
+        help = "List of hosts to scan."
+    )
+    parser.add_argument(
+        "--ranges",
+        nargs = "+",
+        help = "List of port ranges to scan. Either one range for all hosts or one per host."
+    )
+    return parser.parse_args()
 
-    host_to_range = {}
+def handle_cli_mode(hosts, ranges):
+    results = []
+    num_hosts = len(hosts)
+    num_ranges = len(ranges)
+
+    if num_ranges == 1:
+        port_ranges = [ranges[0]] * num_hosts
+    elif num_hosts == num_ranges:
+        port_ranges = ranges
+    else:
+        print("Error: Number of ranges must be 1 or match number of hosts.")
+        return []
+    
+    for host, port_range in zip(hosts, port_ranges):
+        print(f"--- Scanning {host} ---")
+        scanner = PortScanner(host, port_range)
+        summary = scanner.scan()
+        results.append(summary)
+
+    return results
+
+def handle_interactive_mode():
+    print("Welcome to the Multi-Host Port Scanner!")
+    results = {}
+    
     while True:
         result = get_valid_host_and_range()
         if not result:
             break
+
         host, port_range = result
-        host_to_range[host] = port_range
+        results[host] = port_range
 
         again = input("Would you like to scan another host? (y/n): ").strip().lower()
         if again != 'y':
             break
 
-    results = []
-    for host, port_range in host_to_range.items():
+    scan_summaries = []
+    for host, port_range in results.items():
         print(f"\n--- Scanning {host} ---")
         scanner = PortScanner(host, port_range)
         summary = scanner.scan()
-        results.append(summary)
+        scan_summaries.append(summary)
 
-    export_json(results)
+    return scan_summaries
+
+def main():
+    args = parse_arguments()
+    results = []
+
+    if args.hosts and args.ranges:
+        results = handle_cli_mode(args.hosts, args.ranges)
+    else:
+        results = handle_interactive_mode()
+
+    if results:
+        export_json(results)
 
 if __name__ == "__main__":
     main()

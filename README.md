@@ -12,10 +12,11 @@ Here are some features that I plan on adding and will check off (+) as I continu
 * Service detection (banner grabbing) (+)
 * Implement different scan types (SYN scan, stealth scan)
 * JSON report generation (+)
-* Scan multiple hosts
+* Scan multiple hosts (+)
 * Add IDS evasion techniques
 * Recon features like Geolocation or WHOIS lookup
-* Threading/Concurrency
+* Threading/Concurrency (+)
+* Command line arguments (+)
 
 Here are some other features that I think would be cool but probably wont implement in full:
 
