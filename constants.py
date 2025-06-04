@@ -53,5 +53,8 @@ COMMON_PORTS = {
     8888: "Web Servers (Dev)",
     9001: "Tor ORPort",
     9200: "Elasticsearch",
+    9929: "Nping-echo",
     10000: "Webmin",
 }
+
+MAX_BANNER_LENGTH = 30
